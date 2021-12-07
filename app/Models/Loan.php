@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Notifications\Notifiable;
 
 class Loan extends Model
 {
@@ -15,7 +16,43 @@ class Loan extends Model
     public const CURRENCY_SGD = 'SGD';
     public const CURRENCY_VND = 'VND';
 
-    use HasFactory;
+    use HasFactory, Notifiable;
+
+    public function repaid() {
+        $this->outstanding_amount = 0;
+        $this->status = Loan::STATUS_REPAID;
+    }
+
+    public function updateRepaid() {
+        if ($this->outstanding_amount == 0 || $this->status == Loan::STATUS_REPAID) {
+            $this->repaid();
+        }
+    }
+
+    protected static function booted()
+    {
+        static::creating(function (Loan $loan) {
+            $loan->outstanding_amount = $loan->outstanding_amount ?? $loan->amount;
+        });
+        static::updating(function (Loan $loan) {
+            $loan->updateRepaid();
+        });
+    }
+
+    public function setStatusAttribute($value) {
+        if ($value == Loan::STATUS_REPAID) {
+            $this->attributes['outstanding_amount'] = 0;
+        }
+        $this->attributes['status'] = $value;
+    }
+
+    public function setOutstandingAmountAttribute($value) {
+        assert($value >= 0);
+        if ($value == 0) {
+            $this->status = Loan::STATUS_REPAID;
+        }
+        $this->attributes['outstanding_amount'] = $value;
+    }
 
     /**
      * The table associated with the model.
